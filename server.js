@@ -33,12 +33,17 @@ async function sendQuery() {
   appendMessage(userQuery, 'user');
   queryInput.value = '';
   try {
+    // Debug: log what is being sent
+    console.log('Sending:', userQuery);
+    console.log('Tool:', selectedTool);
     const response = await fetch('/api/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt: userQuery, tool: selectedTool })
     });
     const result = await response.json();
+    // Debug: log what is received
+    console.log('Received:', result);
     hideLoading();
     submitBtn.disabled = false;
     if (result.answer) {
@@ -52,6 +57,8 @@ async function sendQuery() {
     hideLoading();
     submitBtn.disabled = false;
     appendMessage(`<span class='text-red-500'>Sorry, the AI service is temporarily unavailable. Please try again later.</span>`, 'model');
+    // Debug: log fetch error
+    console.error('Fetch error:', error);
   }
 }
 
