@@ -50,13 +50,20 @@ app.post("/api/ask", async (req, res) => {
     fullPrompt = `You are a prompt engineering expert. Rewrite the following user query to be more specific, clear, and structured for a legal AI. User Query: "${prompt}" Return only the optimized version.`;
   } else if (tool === 'followup') {
     fullPrompt = prompt;
+  } else if (tool && TOOL_PROMPTS[tool]) {
+    // Tool is selected and recognized
+    fullPrompt = `${TOOL_PROMPTS[tool]}
+
+User question: ${prompt}
+
+Please answer the user's question above, using the instructions provided. Respond directly to the user's question, do not repeat these instructions.`;
   } else {
-    let systemPrompt = BASE_PROMPT;
-    if (reasoning) {
-      systemPrompt = REASONING_PROMPT;
-    }
-    const toolPrompt = TOOL_PROMPTS[tool] || '';
-    fullPrompt = `${systemPrompt}\n\n${toolPrompt}\n\nQuery: ${prompt}`;
+    // No tool selected or tool not recognized, use BASE_PROMPT
+    fullPrompt = `${BASE_PROMPT}
+
+User question: ${prompt}
+
+Please answer the user's question above, using the instructions provided. Respond directly to the user's question, do not repeat these instructions.`;
   }
 
   try {
