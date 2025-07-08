@@ -8,12 +8,20 @@ app.use(express.json());
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
+if (!GEMINI_API_KEY) {
+  console.error("ERROR: GEMINI_API_KEY environment variable is not set!");
+}
+
 app.post("/api/generate", async (req, res) => {
   const userPrompt = req.body.prompt;
 
+  if (!GEMINI_API_KEY) {
+    return res.status(500).json({ error: "GEMINI_API_KEY is not set on the server." });
+  }
+
   try {
     const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
       {
         contents: [
           {
@@ -42,4 +50,4 @@ app.post("/api/generate", async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Gemini 2.5 Flash backend running on port ${PORT}`);
-});
+}); 
