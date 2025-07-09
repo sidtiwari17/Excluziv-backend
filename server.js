@@ -3,12 +3,6 @@
 // State
 let selectedTool = 'aiCaseSummary'; // Default tool
 
-// DOM Elements
-const queryInput = document.getElementById('ai-query-input');
-const submitBtn = document.getElementById('ai-submit-btn');
-const chatArea = document.getElementById('ai-chat-area');
-const toolButtons = document.querySelectorAll('.ai-tool-btn');
-
 // Tool selection
 if (toolButtons) {
   toolButtons.forEach(btn => {
