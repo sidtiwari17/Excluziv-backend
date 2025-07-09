@@ -1,11 +1,99 @@
 const express = require("express");
 const fetch = require("node-fetch");
 const cors = require("cors");
+const multer = require("multer");
+const fs = require("fs");
+const path = require("path");
 require("dotenv").config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = 'uploads/';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-' + file.originalname);
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: function (req, file, cb) {
+    // Allow PDF, DOCX, and image files
+    const allowedTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/bmp',
+      'text/plain'
+    ];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only PDF, DOCX, images, and text files are allowed.'), false);
+    }
+  }
+});
+
+// File processing functions
+async function extractTextFromPDF(filePath) {
+  try {
+    const pdf = require('pdf-parse');
+    const dataBuffer = fs.readFileSync(filePath);
+    const data = await pdf(dataBuffer);
+    return data.text;
+  } catch (error) {
+    console.error('PDF extraction error:', error);
+    return 'Error extracting text from PDF';
+  }
+}
+
+async function extractTextFromDOCX(filePath) {
+  try {
+    const mammoth = require('mammoth');
+    const result = await mammoth.extractRawText({ path: filePath });
+    return result.value;
+  } catch (error) {
+    console.error('DOCX extraction error:', error);
+    return 'Error extracting text from DOCX';
+  }
+}
+
+async function extractTextFromImage(filePath) {
+  try {
+    const Tesseract = require('tesseract.js');
+    const { data: { text } } = await Tesseract.recognize(filePath, 'eng');
+    return text;
+  } catch (error) {
+    console.error('Image OCR error:', error);
+    return 'Error extracting text from image';
+  }
+}
+
+async function extractTextFromFile(filePath, mimeType) {
+  if (mimeType === 'application/pdf') {
+    return await extractTextFromPDF(filePath);
+  } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+    return await extractTextFromDOCX(filePath);
+  } else if (mimeType.startsWith('image/')) {
+    return await extractTextFromImage(filePath);
+  } else if (mimeType === 'text/plain') {
+    return fs.readFileSync(filePath, 'utf8');
+  } else {
+    return 'Unsupported file type';
+  }
+}
 
 // --- Tool Prompts ---
 const TOOL_PROMPTS = {
@@ -29,11 +117,31 @@ const REASONING_PROMPT = `Think analytically about the query like a seasoned leg
 
 const BASE_PROMPT = `You are an experienced legal professional. Provide clear, accurate, and practical legal answers to the user's query, using your expertise in Indian law. Respond directly to the user's input.`;
 
-// --- Main AI Handler ---
-app.post("/api/ask", async (req, res) => {
+// --- Main AI Handler with File Upload Support ---
+app.post("/api/ask", upload.array('files', 10), async (req, res) => {
   const { prompt, tool, context, reasoning } = req.body;
+  const files = req.files || [];
 
   let fullPrompt = '';
+  let fileContents = '';
+
+  // Process uploaded files
+  if (files.length > 0) {
+    const fileTexts = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const text = await extractTextFromFile(file.path, file.mimetype);
+        fileTexts.push(`[File ${i + 1}: ${file.originalname}]\n${text}`);
+        // Clean up uploaded file
+        fs.unlinkSync(file.path);
+      } catch (error) {
+        console.error(`Error processing file ${file.originalname}:`, error);
+        fileTexts.push(`[File ${i + 1}: ${file.originalname}]\nError processing this file.`);
+      }
+    }
+    fileContents = '\n\n--- UPLOADED DOCUMENTS ---\n' + fileTexts.join('\n\n') + '\n\n--- END DOCUMENTS ---\n\n';
+  }
 
   if (reasoning) {
     // Reasoning mode: BASE REASONING PROMPT + TOOL PROMPT (if any) + context/user query
@@ -57,6 +165,12 @@ app.post("/api/ask", async (req, res) => {
     } else {
       fullPrompt = `${basePrompt}\n\nUser question: ${prompt}\n\nPlease answer the user's question above, using the instructions provided. Respond directly to the user's question, do not repeat these instructions.`;
     }
+  }
+
+  // Add file contents to the prompt if files were uploaded
+  if (fileContents) {
+    fullPrompt = fullPrompt.replace('User question:', `User question: ${fileContents}`);
+    fullPrompt = fullPrompt.replace('User follow-up:', `User follow-up: ${fileContents}`);
   }
 
   try {
