@@ -1,16 +1,26 @@
 {
-  "name": "excluziv-backend",
+  "name": "legal-ai-assistant",
   "version": "1.0.0",
-  "description": "Gemini 2.5 Flash secure backend",
+  "description": "Legal AI Assistant with file upload support",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
   "dependencies": {
-    "axios": "^1.6.8",
-    "cors": "^2.8.5",
     "express": "^4.18.2",
+    "node-fetch": "^2.7.0",
+    "cors": "^2.8.5",
+    "multer": "^1.4.5-lts.1",
     "dotenv": "^16.3.1",
-    "node-fetch": "^2.6.12"
-  }
-}
+    "pdf-parse": "^1.1.1",
+    "mammoth": "^1.6.0",
+    "tesseract.js": "^4.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": ["legal", "ai", "assistant", "file-upload"],
+  "author": "",
+  "license": "ISC"
+} 
