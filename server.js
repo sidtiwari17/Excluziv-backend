@@ -1,23 +1,144 @@
-const express = require("express");
-const axios = require("axios");
-const cors = require("cors");
+// ai-assistant.js
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+// State
+let selectedTool = 'aiCaseSummary'; // Default tool
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+// DOM Elements
+const queryInput = document.getElementById('ai-query-input');
+const submitBtn = document.getElementById('ai-submit-btn');
+const chatArea = document.getElementById('ai-chat-area');
+const toolButtons = document.querySelectorAll('.ai-tool-btn');
 
-const BASE_PROMPT = `You are a highly intelligent, adaptive Legal AI Assistant with over 10 years of simulated professional experience in national and international legal systems. Your expertise spans statutory interpretation, procedural frameworks, advanced legal drafting, and comprehensive case law analysis.
+// Tool selection
+if (toolButtons) {
+  toolButtons.forEach(btn => {
+    btn.addEventListener('click', function() {
+      toolButtons.forEach(b => b.classList.remove('ring-2', 'ring-blue-500'));
+      btn.classList.add('ring-2', 'ring-blue-500');
+      selectedTool = btn.getAttribute('data-tool') || 'aiCaseSummary';
+      queryInput.focus();
+    });
+  });
+}
 
-You are entrusted with the task of delivering legally accurate, context-sensitive, and analytically sound responses tailored precisely to the substance and complexity of each legal query. Your reasoning must reflect critical legal thinking, interpretive clarity, and jurisdictional precision.
+// Send query
+async function sendQuery() {
+  const userQuery = queryInput.value.trim();
+  if (!userQuery) {
+    showCustomAlert('Please enter a query.');
+    return;
+  }
+  submitBtn.disabled = true;
+  showLoading();
+  appendMessage(userQuery, 'user');
+  queryInput.value = '';
+  try {
+    // Debug: log what is being sent
+    console.log('Sending:', userQuery);
+    console.log('Tool:', selectedTool);
+    const response = await fetch('/api/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: userQuery, tool: selectedTool })
+    });
+    const result = await response.json();
+    // Debug: log what is received
+    console.log('Received:', result);
+    hideLoading();
+    submitBtn.disabled = false;
+    if (result.answer) {
+      appendMessage(result.answer, 'model');
+    } else if (result.error) {
+      appendMessage(`<span class='text-red-500'>${result.error}</span>`, 'model');
+    } else {
+      appendMessage(`<span class='text-red-500'>Sorry, no answer was generated.</span>`, 'model');
+    }
+  } catch (error) {
+    hideLoading();
+    submitBtn.disabled = false;
+    appendMessage(`<span class='text-red-500'>Sorry, the AI service is temporarily unavailable. Please try again later.</span>`, 'model');
+    // Debug: log fetch error
+    console.error('Fetch error:', error);
+  }
+}
 
-Each response should demonstrate the judgment and clarity expected of a senior legal associate or advisor. Prioritize logical structure, evidentiary grounding, and clear articulation of legal principles.
+// Event listeners
+if (submitBtn) {
+  submitBtn.addEventListener('click', sendQuery);
+}
+if (queryInput) {
+  queryInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendQuery();
+    }
+  });
+}
 
-Maintain a formal, neutral tone suitable for legal professionals, and where appropriate, conclude with a practical course of action or advisory note.
+// Message rendering
+function appendMessage(content, role) {
+  const messageDiv = document.createElement('div');
+  messageDiv.className = `p-4 rounded-lg mb-4 ${role === 'user' ? 'bg-blue-100 dark:bg-blue-900/50' : 'bg-gray-200 dark:bg-gray-700'}`;
+  messageDiv.innerHTML = role === 'user'
+    ? `<p class='font-semibold mb-2'><i class='fas fa-user mr-2'></i>You</p><div>${escapeHtml(content)}</div>`
+    : `<div class='flex justify-between items-start'><p class='font-semibold mb-2'><i class='fas fa-robot mr-2'></i>AI Assistant</p></div><div>${formatMarkdown(content)}</div>`;
+  chatArea.appendChild(messageDiv);
+  messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
 
-⚖️ *This is an AI-generated legal insight intended for informational purposes only and does not constitute legal advice.*`;
+// Loading spinner
+let loadingDiv = null;
+function showLoading() {
+  if (!loadingDiv) {
+    loadingDiv = document.createElement('div');
+    loadingDiv.innerHTML = `<div class='flex items-center'><div class='animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3'></div><span>AI is thinking...</span></div>`;
+    chatArea.appendChild(loadingDiv);
+    chatArea.scrollTop = chatArea.scrollHeight;
+  }
+}
+function hideLoading() {
+  if (loadingDiv) {
+    loadingDiv.remove();
+    loadingDiv = null;
+  }
+}
 
+// Custom alert
+function showCustomAlert(message) {
+  let alertBox = document.getElementById('custom-alert-box');
+  if (!alertBox) {
+    alertBox = document.createElement('div');
+    alertBox.id = 'custom-alert-box';
+    alertBox.className = 'fixed top-5 right-5 bg-blue-600 text-white py-2 px-4 rounded-lg shadow-lg z-50 transition-opacity duration-300 opacity-0';
+    document.body.appendChild(alertBox);
+  }
+  alertBox.innerText = message;
+  alertBox.classList.remove('opacity-0');
+  setTimeout(() => { alertBox.classList.add('opacity-0'); }, 3000);
+}
+
+// Markdown formatting (simple)
+function formatMarkdown(text) {
+  let html = text
+    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^- (.*$)/gim, '<li>$1</li>');
+  html = html.replace(/<li>/g, '<ul><li>').replace(/<\/li>\n(?!<li>)/g, '</li></ul>');
+  return html.replace(/\n/g, '<br />').replace(/<br \/><ul>/g, '<ul>').replace(/<\/ul><br \/>/g, '</ul>');
+}
+
+// Escape HTML
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.innerText = text;
+  return div.innerHTML;
+}
+
+// --- Tool Prompts (from server.js lines 21-36) ---
 const TOOL_PROMPTS = {
   legalDefinitions: `You are a legal dictionary and terminology expert. Always answer the user's input as best as possible. If the user enters a legal term or phrase, provide a clear, concise, and authoritative definition. If the jurisdiction is not specified, default to Indian law and legal context. Include statutory references, relevant case law, and explain the term's practical significance within Indian legal practice. Use plain language, but clarify technical terms as needed. If the term has multiple meanings, briefly outline each, noting the most common usage in India. If the input is a general question or scenario, answer as best as possible based on your legal knowledge. Respond directly to the user's input.`,
   caseInsights: `You are a legal analyst specializing in case law. Always answer the user's input as best as possible. If provided with a case citation, summary, or facts, extract and present key insights, including legal issues, holdings, judicial reasoning, and implications. If no jurisdiction is specified, focus on Indian courts and legal principles. Highlight relevant precedents, statutory interpretation, and any notable dissenting or concurring opinions. Summarize the impact and potential future relevance of the case under Indian law. If the input is a question or scenario, identify and summarize the most relevant case law based on your legal knowledge. Respond directly to the user's input.`,
@@ -35,99 +156,58 @@ const TOOL_PROMPTS = {
   contractIntel: `You are a contract intelligence engine. Always answer the user's input as best as possible. If a contract is uploaded, analyze and extract key clauses, obligations, deadlines, and risks. If the input is a scenario or question, explain how you would analyze a contract in such a context, or provide general advice based on the information given. Summarize critical terms, flag unusual or missing provisions, and suggest best practices for negotiation or amendment. Respond directly to the user's input.`
 };
 
+// --- Reasoning Prompt (from server.js lines 38-39) ---
 const REASONING_PROMPT = `Think analytically about the query like a seasoned legal professional such as Ram Jethmalani, Kapil Sibal, or Harish Salve. Critically analyze the query, use deep legal acumen, and provide logical, well-reasoned answers. Apply advanced legal reasoning, cite relevant precedents where appropriate, and ensure your response reflects the highest standards of legal professionalism.`;
 
-app.post("/api/ask", async (req, res) => {
-  const { prompt, tool, reasoning } = req.body;
+// --- General Base Prompt ---
+const BASE_PROMPT = `You are an experienced legal professional. Provide clear, accurate, and practical legal answers to the user's query, using your expertise in Indian law. Respond directly to the user's input.`;
 
-  if (!GEMINI_API_KEY) {
-    return res.status(500).json({ error: "AI service unavailable" });
-  }
+// --- Main AI Handler ---
+app.post('/api/ask', async (req, res) => {
+  const { prompt, tool, context, reasoning } = req.body;
 
-  let fullPrompt = "";
+  let fullPrompt = '';
 
-  if (tool === 'optimizer') {
-    fullPrompt = `You are a prompt engineering expert. Rewrite the following user query to be more specific, clear, and structured for a legal AI. User Query: "${prompt}" Return only the optimized version.`;
-  } else if (tool === 'followup') {
-    fullPrompt = prompt;
-  } else if (tool && TOOL_PROMPTS[tool]) {
-    // Tool is selected and recognized
-    fullPrompt = `${TOOL_PROMPTS[tool]}
-
-User question: ${prompt}
-
-Please answer the user's question above, using the instructions provided. Respond directly to the user's question, do not repeat these instructions.`;
+  if (reasoning) {
+    // Reasoning mode: BASE REASONING PROMPT + TOOL PROMPT (if any) + context/user query
+    let base = REASONING_PROMPT;
+    if (tool && TOOL_PROMPTS[tool]) {
+      base += '\n' + TOOL_PROMPTS[tool];
+    }
+    if (context) {
+      fullPrompt = `${base}\n\nPrevious context: ${context}\nUser follow-up: ${prompt}\n\nPlease answer the user's follow-up, using the previous context and instructions above. Respond directly to the user's follow-up, do not repeat these instructions.`;
+    } else {
+      fullPrompt = `${base}\n\nUser question: ${prompt}\n\nPlease answer the user's question above, using the instructions provided. Respond directly to the user's question, do not repeat these instructions.`;
+    }
   } else {
-    // No tool selected or tool not recognized, use BASE_PROMPT
-    fullPrompt = `${BASE_PROMPT}
-
-User question: ${prompt}
-
-Please answer the user's question above, using the instructions provided. Respond directly to the user's question, do not repeat these instructions.`;
+    // Non-reasoning mode: previous logic
+    let basePrompt = BASE_PROMPT;
+    if (tool && TOOL_PROMPTS[tool]) {
+      basePrompt = TOOL_PROMPTS[tool];
+    }
+    if (context) {
+      fullPrompt = `${basePrompt}\n\nPrevious context: ${context}\n\nUser follow-up: ${prompt}\n\nPlease answer the user's follow-up, using the previous context and instructions above. Respond directly to the user's follow-up, do not repeat these instructions.`;
+    } else {
+      fullPrompt = `${basePrompt}\n\nUser question: ${prompt}\n\nPlease answer the user's question above, using the instructions provided. Respond directly to the user's question, do not repeat these instructions.`;
+    }
   }
 
   try {
-    // Log the prompt for debugging
-    console.log("Prompt sent to Gemini:", fullPrompt);
-
-    const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
-      {
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: fullPrompt }]
-          }
-        ]
-      },
-      {
-        headers: {
-          "Content-Type": "application/json"
-        },
-        params: {
-          key: GEMINI_API_KEY
-        }
-      }
-    );
-
-    // Log the raw Gemini response
-    console.log("Gemini raw response:", JSON.stringify(response.data));
-
-    let answer = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-    // Fallback: If answer is empty or generic, try a simpler prompt
-    if (!answer || /I am ready|please provide|summarize|assist you|provide the case document|ready to assist/i.test(answer)) {
-      const fallbackPrompt = `You are a legal expert. Even if the information is incomplete, make reasonable assumptions and answer the question as best as possible. Do not ask for more information. User: ${prompt}`;
-      const fallbackResponse = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
-        {
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: fallbackPrompt }]
-            }
-          ]
-        },
-        {
-          headers: {
-            "Content-Type": "application/json"
-          },
-          params: {
-            key: GEMINI_API_KEY
-          }
-        }
-      );
-      answer = fallbackResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't generate a legal answer.";
-    }
-
-    res.json({ answer });
+    // Replace this with your Gemini API call logic
+    // Example: const answer = await callGeminiAPI(fullPrompt);
+    // For now, just echo the prompt for demonstration
+    res.json({ answer: `MOCK AI RESPONSE: ${fullPrompt}` });
   } catch (err) {
-    console.error("AI backend error:", err.response?.data || err.message);
-    res.status(500).json({ error: "Sorry, the AI service is temporarily unavailable. Please try again later." });
+    res.status(500).json({ error: 'AI service unavailable.' });
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 AI backend running on port ${PORT}`);
-}); 
+const cors = require('cors');
+const corsOptions = {
+  origin: 'https://www.excluziv.in',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type'],
+  credentials: true
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); 
