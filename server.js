@@ -200,14 +200,4 @@ app.post('/api/ask', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'AI service unavailable.' });
   }
-});
-
-const cors = require('cors');
-const corsOptions = {
-  origin: 'https://www.excluziv.in',
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type'],
-  credentials: true
-};
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); 
+}); 
