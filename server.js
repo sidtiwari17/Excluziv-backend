@@ -7,7 +7,27 @@ const path = require("path");
 require("dotenv").config();
 
 const app = express();
-app.use(cors());
+// Configure CORS to allow your frontend domain
+const allowedOrigins = ['https://www.excluziv.in', 'https://excluziv.in'];
+
+app.use(cors({
+  origin: function(origin, callback) {
+    // allow requests with no origin (like mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true,
+}));
+
+// Handle preflight requests
+app.options('*', cors({
+  origin: allowedOrigins,
+  credentials: true,
+}));
 app.use(express.json());
 
 // Configure multer for file uploads
