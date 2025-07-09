@@ -1,5 +1,5 @@
 {
-  "name": "gemini-backend",
+  "name": "excluziv-backend",
   "version": "1.0.0",
   "description": "Gemini 2.5 Flash secure backend",
   "main": "server.js",
