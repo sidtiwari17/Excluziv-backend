@@ -143,6 +143,11 @@ const REASONING_PROMPT = `Think analytically about the query like a seasoned leg
 
 const BASE_PROMPT = `You are an experienced legal professional. Provide clear, accurate, and practical legal answers to the user's query, using your expertise in Indian law. Respond directly to the user's input.`;
 
+// Health check route for Render/UptimeRobot
+app.get("/ping", (req, res) => {
+  res.status(200).send("pong");
+});
+
 // --- Main AI Handler with File Upload Support ---
 app.post("/api/ask", upload.array('files', 10), async (req, res) => {
   const { prompt, tool, context, reasoning } = req.body;
