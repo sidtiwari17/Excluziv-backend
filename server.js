@@ -8,6 +8,7 @@ require("dotenv").config();
 const rateLimit = require('express-rate-limit');
 
 const app = express();
+app.set('trust proxy', 1); // Trust the first proxy (Render, Heroku, etc.)
 // Configure CORS to allow your frontend domain
 const allowedOrigins = ['https://www.excluziv.in', 'https://excluziv.in'];
 
