@@ -5,6 +5,7 @@ const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
 require("dotenv").config();
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 // Configure CORS to allow your frontend domain
@@ -29,6 +30,11 @@ app.options('*', cors({
   credentials: true,
 }));
 app.use(express.json());
+app.use(rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 20, // limit each IP to 20 requests per windowMs
+  message: "Too many requests from this IP, please try again later.",
+}));
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
