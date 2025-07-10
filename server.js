@@ -9,27 +9,26 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 app.set('trust proxy', 1); // Trust the first proxy (Render, Heroku, etc.)
-// Configure CORS to allow your frontend domain
-const allowedOrigins = ['https://www.excluziv.in', 'https://excluziv.in'];
+const allowedOrigins = ['https://www.excluziv.in', 'https://excluziv.in', 'http://127.0.0.1:5500']; // Added localhost for local dev
 
-app.use(cors({
-  origin: function(origin, callback) {
-    // allow requests with no origin (like mobile apps, curl, etc.)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
     }
-    return callback(null, true);
   },
   credentials: true,
-}));
+  optionsSuccessStatus: 200 // For legacy browser support
+};
 
-// Handle preflight requests
-app.options('*', cors({
-  origin: allowedOrigins,
-  credentials: true,
-}));
+// Enable CORS for all routes
+app.use(cors(corsOptions));
+
+// Explicitly handle preflight (OPTIONS) requests
+app.options('*', cors(corsOptions));
+
 app.use(express.json());
 app.use(rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
