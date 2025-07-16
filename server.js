@@ -9,7 +9,15 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 app.set('trust proxy', 1); // Trust the first proxy (Render, Heroku, etc.)
-const allowedOrigins = ['https://www.excluziv.in', 'https://excluziv.in', 'http://127.0.0.1:5500']; // Added localhost for local dev
+const allowedOrigins = [
+  'https://www.excluziv.in',
+  'https://excluziv.in',
+  'http://127.0.0.1:5500',
+  'http://localhost:3000',
+  'http://localhost:5500',
+  'https://localhost:3000',
+  'https://localhost:5500'
+];
 
 const corsOptions = {
   origin: function (origin, callback) {
@@ -231,4 +239,3 @@ app.post("/api/ask", upload.array('files', 10), async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
-
